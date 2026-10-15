@@ -121,6 +121,9 @@ async function repricePage() {
         <label class="opt"><input type="radio" name="how" value="obc"> Onboard credit instead</label>
         <label class="opt"><input type="radio" name="how" value="fcc"> Future cruise credit instead</label></fieldset>
       <label for="amt" id="amtLabel"><b>${first ? "What you paid" : "Your new total"}</b> — cruise fare + taxes, whole cabin</label>
+      <p class="muted" id="amtNote" style="margin:2px 0 0">Cruise fare plus taxes, fees &amp; port expenses for everyone in
+        the cabin. <b>Leave out</b> gratuities, insurance, flights, excursions and drink or Wi-Fi packages bought separately.
+        <b>Include</b> perks that came with your fare, like Norwegian's Free at Sea or Princess Plus / Premier.</p>
       <input type="text" id="amt" inputmode="decimal" autocomplete="off" placeholder="e.g. 1450" required>
       <fieldset${first ? " hidden" : ""}><legend>Did our alert help?</legend>
         <label class="opt"><input type="radio" name="ours" value="yes" checked> Yes</label>
@@ -128,8 +131,9 @@ async function repricePage() {
         <label class="opt"><input type="radio" name="ours" value="unsure"> Not sure</label></fieldset>
       <button class="btn" id="go">${first ? "Save" : "Update my price"}</button>
     </form>`);
-  const f = document.getElementById("rp"), lab = document.getElementById("amtLabel");
+  const f = document.getElementById("rp"), lab = document.getElementById("amtLabel"), note = document.getElementById("amtNote");
   f.addEventListener("change", () => {
+    note.hidden = f.how.value !== "lower";
     lab.innerHTML = f.how.value === "lower" ? "<b>Your new total</b> — cruise fare + taxes, whole cabin"
                                             : "<b>Credit amount</b> — for the whole cabin";
   });
