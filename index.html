@@ -62,7 +62,9 @@ const main = document.getElementById("main");
 const hash = new URLSearchParams(location.hash.slice(1));
 const params = {};
 for (const [k, v] of hash) params[k] = v;
-if (params.a) history.replaceState(null, "", location.pathname);   // a reload won't repeat the click
+// One-click links: strip the details so a reload can't repeat the click. The reprice page is a form, so it keeps
+// them (a reload shows the form again) until the form is sent.
+if (params.a && params.a !== "repriced") history.replaceState(null, "", location.pathname);
 
 function show(html) { main.innerHTML = html; }
 function esc(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
@@ -144,7 +146,11 @@ async function repricePage() {
     if (f.how.value === "lower" && info.paid && Number(amt) > Number(info.paid) * 1.5 &&
         !confirm("That's well above what we have on file. Is it the total for the whole cabin?")) return;
     const b = document.getElementById("go"); b.disabled = true; b.textContent = "Saving…";
-    try { render(await call({action: "repriced", how: f.how.value, ours: f.ours.value, amt: amt})); } catch (err) { failed(); }
+    try {
+      const res = await call({action: "repriced", how: f.how.value, ours: f.ours.value, amt: amt});
+      if (res.ok) history.replaceState(null, "", location.pathname);   // a reload won't report it twice
+      render(res);
+    } catch (err) { failed(); }
   });
 }
 
