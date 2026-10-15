@@ -26,6 +26,11 @@
   .btn { display:inline-block; background:var(--navy); color:#fff; border:0; border-radius:8px; padding:12px 20px;
          font:700 15px inherit; font-family:inherit; text-decoration:none; cursor:pointer; }
   .btn[disabled] { opacity:.6; cursor:default; }
+  input[type=text] { width:100%; padding:11px 12px; border:1px solid #C9D5DE; border-radius:8px; font:17px inherit;
+                     font-family:inherit; margin:6px 0 14px; }
+  fieldset { border:0; padding:0; margin:0 0 14px; }
+  legend { font-weight:700; margin-bottom:6px; }
+  label.opt { display:block; padding:6px 0; }
   textarea { width:100%; min-height:110px; padding:10px; border:1px solid #C9D5DE; border-radius:8px;
              font:15px/1.5 inherit; font-family:inherit; margin:6px 0 10px; }
   .spinner { width:28px; height:28px; border:3px solid var(--line); border-top-color:var(--teal); border-radius:50%;
@@ -51,7 +56,7 @@
 // (it is never sent to GitHub). This page passes the click to the Check Cruise Prices bridge and shows the answer.
 const BRIDGE = "https://script.google.com/macros/s/AKfycbxam4-p1bRYMHGRMrJpTtb6AX9nedK7600hUHAcIf9jHfEB8RnOgf8NcQTLMVfjExlU/exec";
 const FORM = "https://docs.google.com/forms/d/e/1FAIpQLSf8m874r6nF-ZhnbFj0VI-1IYn0XfdsFyk2YjWhxMJ1MKC0gw/viewform";
-const ACTIONS = ["confirm", "stop", "nodigest", "feedback", "comment"];
+const ACTIONS = ["confirm", "stop", "nodigest", "feedback", "comment", "repriced"];
 const main = document.getElementById("main");
 
 const hash = new URLSearchParams(location.hash.slice(1));
@@ -102,7 +107,48 @@ function render(r) {
   });
 }
 
+// "I repriced!" — a small form: how it went, the new total (or the credit), and whether our alert helped.
+async function repricePage() {
+  const info = await call({action: "paidinfo"});
+  if (!info.ok) return render(info);
+  const onFile = info.paid ? `$${Number(info.paid).toLocaleString("en-US", {minimumFractionDigits: 2})}` : "";
+  const first = !info.paid;                     // no price on file yet → just ask what they paid
+  show(`<h1>${first ? "What did you pay?" : "Nice — you repriced!"}</h1>
+    <p class="muted">${esc(info.cruise || "Your cruise")}${onFile ? ` · on file: <b>${onFile}</b>` : ""}</p>
+    <form id="rp">
+      <fieldset${first ? " hidden" : ""}><legend>What did you get?</legend>
+        <label class="opt"><input type="radio" name="how" value="lower" checked> A lower price</label>
+        <label class="opt"><input type="radio" name="how" value="obc"> Onboard credit instead</label>
+        <label class="opt"><input type="radio" name="how" value="fcc"> Future cruise credit instead</label></fieldset>
+      <label for="amt" id="amtLabel"><b>${first ? "What you paid" : "Your new total"}</b> — cruise fare + taxes, whole cabin</label>
+      <input type="text" id="amt" inputmode="decimal" autocomplete="off" placeholder="e.g. 1450" required>
+      <fieldset${first ? " hidden" : ""}><legend>Did our alert help?</legend>
+        <label class="opt"><input type="radio" name="ours" value="yes" checked> Yes</label>
+        <label class="opt"><input type="radio" name="ours" value="no"> No — I found it myself</label>
+        <label class="opt"><input type="radio" name="ours" value="unsure"> Not sure</label></fieldset>
+      <button class="btn" id="go">${first ? "Save" : "Update my price"}</button>
+    </form>`);
+  const f = document.getElementById("rp"), lab = document.getElementById("amtLabel");
+  f.addEventListener("change", () => {
+    lab.innerHTML = f.how.value === "lower" ? "<b>Your new total</b> — cruise fare + taxes, whole cabin"
+                                            : "<b>Credit amount</b> — for the whole cabin";
+  });
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    const amt = f.amt.value.replace(/[$,\s]/g, "");
+    if (!(Number(amt) > 0)) { f.amt.focus(); return; }
+    if (f.how.value === "lower" && info.paid && Number(amt) > Number(info.paid) * 1.5 &&
+        !confirm("That's well above what we have on file. Is it the total for the whole cabin?")) return;
+    const b = document.getElementById("go"); b.disabled = true; b.textContent = "Saving…";
+    try { render(await call({action: "repriced", how: f.how.value, ours: f.ours.value, amt: amt})); } catch (err) { failed(); }
+  });
+}
+
 (async () => {
+  if (params.a === "repriced" && params.r && params.s) {
+    try { await repricePage(); } catch (err) { failed(); }
+    return;
+  }
   if (!ACTIONS.includes(params.a) || !params.r || !params.s) {
     show(`<h1>Get an email when your cruise price drops</h1>
       <p>Tell us your sailing and cabin. We check the cruise line's public price every morning and email you when it drops —
