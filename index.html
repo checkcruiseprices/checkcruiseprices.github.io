@@ -69,9 +69,12 @@ if (params.a && params.a !== "repriced") history.replaceState(null, "", location
 function show(html) { main.innerHTML = html; }
 function esc(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
 
+// Google's /exec server answers 400 (no CORS header → "Failed to fetch") to any request with a parameter named "c",
+// so the email links' c= (which email the click came from) goes to the bridge as "about".
 function bridgeQuery(extra) {
   const q = new URLSearchParams({action: params.a, row: params.r, sig: params.s});
-  for (const k of ["k", "v", "c", "all"]) if (params[k]) q.set(k, params[k]);
+  for (const k of ["k", "v", "all"]) if (params[k]) q.set(k, params[k]);
+  if (params.c) q.set("about", params.c);
   for (const [k, v] of Object.entries(extra || {})) q.set(k, v);
   return q;
 }
@@ -103,7 +106,7 @@ function render(r) {
     const btn = document.getElementById("send"); btn.disabled = true; btn.textContent = "Sending…";
     const text = document.getElementById("t").value.trim();
     try {
-      const res = await call({action: "comment", k: r.kind || params.k || "", c: r.about || params.c || "", text: text});
+      const res = await call({action: "comment", k: r.kind || params.k || "", about: r.about || params.c || "", text: text});
       show(`<h1>${esc(res.title)}</h1><p>${res.msg}</p>`);
     } catch (err) { failed(); }
   });
